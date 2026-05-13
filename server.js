@@ -235,21 +235,21 @@ app.get("/api/yappy/caja/config-test", (req, res) => {
 // ======================================
 
 app.get("/api/yappy/caja/session-test", async (req, res) => {
-
   try {
-
     const response = await axios.post(
-
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-
-      {},
-
+      {
+        body: {
+          code: YAPPY_CAJA_SECRET_KEY,
+        },
+      },
       {
         headers: {
-          "x-api-key": YAPPY_CAJA_API_KEY,
-          "x-secret-key": YAPPY_CAJA_SECRET_KEY,
+          "API Key": YAPPY_CAJA_API_KEY,
+          "API secret Key": YAPPY_CAJA_SECRET_KEY,
           "Content-Type": "application/json",
         },
+        timeout: 15000,
       }
     );
 
@@ -257,17 +257,14 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
       ok: true,
       data: response.data,
     });
-
   } catch (error) {
-
     console.log("ERROR LOGIN YAPPY CAJA");
-
-    console.log(
-      error.response?.data || error.message
-    );
+    console.log("STATUS:", error.response?.status);
+    console.log("DATA:", error.response?.data || error.message);
 
     return res.status(500).json({
       ok: false,
+      statusHttp: error.response?.status,
       error: error.response?.data || error.message,
     });
   }
