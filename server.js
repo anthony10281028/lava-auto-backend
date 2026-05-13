@@ -18,11 +18,29 @@ const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
 app.get("/", (req, res) => {
   res.json({
     ok: true,
-    message: "Backend Lava Auto activo",
+    message: "Backend Lava Auto activo - QR v2",
   });
 });
 
-app.post("/api/yappy/create-order", async (req, res) => {
+app.get("/rutas", (req, res) => {
+  res.json({
+    ok: true,
+    version: "QR v2",
+    rutas: [
+      "GET /",
+      "GET /rutas",
+      "POST /api/yappy/create-order-web",
+      "POST /api/yappy/create-qr",
+      "POST /api/yappy/ipn",
+    ],
+  });
+});
+
+// ======================================
+// YAPPY BOTÓN DE PAGO / WEB CHECKOUT
+// ======================================
+
+app.post("/api/yappy/create-order-web", async (req, res) => {
   try {
     const { total } = req.body;
 
@@ -33,36 +51,32 @@ app.post("/api/yappy/create-order", async (req, res) => {
       });
     }
 
-    console.log("========== CONFIG YAPPY ==========");
+    console.log("========== CONFIG YAPPY WEB ==========");
     console.log("BASE_URL:", BASE_URL);
     console.log("MERCHANT_ID:", MERCHANT_ID ? "CARGADO" : "VACÍO");
     console.log("DOMAIN:", DOMAIN);
     console.log("ALIAS_YAPPY:", ALIAS_YAPPY);
     console.log("IPN_URL:", IPN_URL);
     console.log("TOTAL:", total);
-    console.log("==================================");
-
-    // =========================
-    // PASO 1: VALIDAR COMERCIO
-    // =========================
+    console.log("======================================");
 
     let validar;
 
     try {
-        validar = await axios.post(
-          `${BASE_URL}/payments/validate/merchant`,
-          {
-            merchantId: MERCHANT_ID,
-            urlDomain: DOMAIN,
+      validar = await axios.post(
+        `${BASE_URL}/payments/validate/merchant`,
+        {
+          merchantId: MERCHANT_ID,
+          urlDomain: DOMAIN,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            secretKey: SECRET_KEY,
           },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              secretKey: SECRET_KEY,
-            },
-            timeout: 15000,
-          }
-        );
+          timeout: 15000,
+        }
+      );
 
       console.log("VALIDAR COMERCIO OK:", JSON.stringify(validar.data, null, 2));
     } catch (error) {
@@ -90,10 +104,6 @@ app.post("/api/yappy/create-order", async (req, res) => {
       });
     }
 
-    // =========================
-    // PASO 2: CREAR ORDEN
-    // =========================
-
     const orderId = `L${Date.now().toString().slice(-14)}`;
     const totalFormato = Number(total).toFixed(2);
 
@@ -102,7 +112,7 @@ app.post("/api/yappy/create-order", async (req, res) => {
         `${BASE_URL}/payments/payment-wc`,
         {
           merchantId: MERCHANT_ID,
-          orderId: orderId,
+          orderId,
           domain: DOMAIN,
           paymentDate: new Date().toISOString(),
           aliasYappy: ALIAS_YAPPY,
@@ -121,36 +131,94 @@ app.post("/api/yappy/create-order", async (req, res) => {
         }
       );
 
-      console.log("CREAR ORDEN OK:", JSON.stringify(orden.data, null, 2));
+      console.log("CREAR ORDEN WEB OK:", JSON.stringify(orden.data, null, 2));
 
       return res.json({
         ok: true,
-        orderId: orderId,
+        tipo: "web_checkout",
+        orderId,
         data: orden.data,
       });
     } catch (error) {
-      console.log("ERROR EN CREAR ORDEN");
+      console.log("ERROR EN CREAR ORDEN WEB");
       console.log("STATUS:", error.response?.status);
       console.log("DATA:", JSON.stringify(error.response?.data, null, 2));
       console.log("MESSAGE:", error.message);
 
       return res.status(500).json({
         ok: false,
-        paso: "crear_orden",
+        paso: "crear_orden_web",
         statusHttp: error.response?.status,
         error: error.response?.data || error.message,
       });
     }
   } catch (error) {
-    console.log("ERROR GENERAL:", error.message);
+    console.log("ERROR GENERAL WEB:", error.message);
 
     return res.status(500).json({
       ok: false,
-      paso: "general",
+      paso: "general_web",
       error: error.message,
     });
   }
 });
+
+// ======================================
+// YAPPY EN CAJA / QR DINÁMICO
+// Endpoint preparado para integrar QR real
+// ======================================
+
+app.post("/api/yappy/create-qr", async (req, res) => {
+  try {
+    const { total, concepto } = req.body;
+
+    if (!total || isNaN(total)) {
+      return res.status(400).json({
+        ok: false,
+        message: "Debe enviar un total válido",
+      });
+    }
+
+    const orderId = `LAVA${Date.now()}`;
+    const totalFormato = Number(total).toFixed(2);
+
+    console.log("========== YAPPY QR CAJA ==========");
+    console.log("ORDER_ID:", orderId);
+    console.log("TOTAL:", totalFormato);
+    console.log("CONCEPTO:", concepto || "Lavado Lava Auto");
+    console.log("===================================");
+
+    return res.json({
+      ok: true,
+      tipo: "yappy_caja_qr",
+      orderId,
+      total: totalFormato,
+      concepto: concepto || "Lavado Lava Auto",
+      message: "Endpoint preparado para Yappy en Caja. Falta conectar el endpoint oficial de QR dinámico.",
+    });
+  } catch (error) {
+    console.log("ERROR GENERAL QR:", error.message);
+
+    return res.status(500).json({
+      ok: false,
+      paso: "crear_qr_caja",
+      error: error.message,
+    });
+  }
+});
+
+// Mantengo compatibilidad con tu endpoint anterior
+app.post("/api/yappy/create-order", async (req, res) => {
+  return res.status(410).json({
+    ok: false,
+    message:
+      "Este endpoint fue reemplazado. Usa /api/yappy/create-order-web para Web Checkout o /api/yappy/create-qr para Yappy en Caja.",
+  });
+});
+
+// ======================================
+// IPN / CALLBACK YAPPY
+// ======================================
 
 app.post("/api/yappy/ipn", (req, res) => {
   console.log("IPN YAPPY:", req.body);
