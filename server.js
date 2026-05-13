@@ -198,61 +198,53 @@ app.post("/api/yappy/create-order", async (req, res) => {
 // TEST CONFIG YAPPY EN CAJA
 // ======================================
 
-app.get("/api/yappy/caja/config-test", (req, res) => {
-  res.json({
-    ok: true,
-    baseUrl: YAPPY_CAJA_BASE_URL || "NO CONFIGURADO",
-    apiKey: YAPPY_CAJA_API_KEY ? "CARGADO" : "NO CONFIGURADO",
-    secretKey: YAPPY_CAJA_SECRET_KEY ? "CARGADO" : "NO CONFIGURADO",
-    seed: YAPPY_CAJA_SEED ? "CARGADO" : "NO CONFIGURADO",
-  });
-});
-
-// ======================================
-// LOGIN TEST YAPPY EN CAJA CON SEMILLA
-// ======================================
-
 app.get("/api/yappy/caja/session-test", async (req, res) => {
-  try {
-    if (!YAPPY_CAJA_SEED) {
-      return res.status(400).json({
-        ok: false,
-        message: "Falta configurar YAPPY_CAJA_SEED en Render.",
+  const unidades = ["LVAE-01", "LVAE-02"];
+
+  const resultados = [];
+
+  for (const unidad of unidades) {
+    try {
+      const response = await axios.post(
+        `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+        {
+          body: {
+            code: YAPPY_CAJA_SEED,
+            groupId: "Lavaauto",
+            unitId: unidad,
+            deviceId: unidad,
+            collectionAlias: unidad,
+          },
+        },
+        {
+          headers: {
+            "api-key": YAPPY_CAJA_API_KEY,
+            "secret-key": YAPPY_CAJA_SECRET_KEY,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        }
+      );
+
+      return res.json({
+        ok: true,
+        unidadCorrecta: unidad,
+        data: response.data,
+      });
+    } catch (error) {
+      resultados.push({
+        unidad,
+        statusHttp: error.response?.status || null,
+        error: error.response?.data || error.message,
       });
     }
-
-    const response = await axios.post(
-      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-      {
-        body: {
-          code: YAPPY_CAJA_SEED,
-        },
-      },
-      {
-        headers: {
-          "api-key": YAPPY_CAJA_API_KEY,
-          "secret-key": YAPPY_CAJA_SECRET_KEY,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
-
-    return res.json({
-      ok: true,
-      data: response.data,
-    });
-  } catch (error) {
-    console.log("ERROR LOGIN YAPPY CAJA");
-    console.log("STATUS:", error.response?.status);
-    console.log("DATA:", error.response?.data || error.message);
-
-    return res.status(500).json({
-      ok: false,
-      statusHttp: error.response?.status,
-      error: error.response?.data || error.message,
-    });
   }
+
+  return res.status(500).json({
+    ok: false,
+    message: "No se pudo iniciar sesión con las unidades de cobro.",
+    resultados,
+  });
 });
 
 // ======================================
