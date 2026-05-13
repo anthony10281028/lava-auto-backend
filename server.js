@@ -104,7 +104,7 @@ app.post("/api/yappy/create-order", async (req, res) => {
           merchantId: MERCHANT_ID,
           orderId: orderId,
           domain: DOMAIN,
-          paymentDate: Date.now(),
+          paymentDate: new Date().toISOString(),
           aliasYappy: ALIAS_YAPPY,
           ipnUrl: IPN_URL,
           discount: "0.00",
