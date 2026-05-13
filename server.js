@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
@@ -17,12 +18,6 @@ const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
 const YAPPY_CAJA_BASE_URL = process.env.YAPPY_CAJA_BASE_URL;
 const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
 const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
-const express = require("express");
-const cors = require("cors");
-const axios = require("axios");
-const crypto = require("crypto");
-require("dotenv").config();
-
 app.get("/", (req, res) => {
   res.json({
     ok: true,
