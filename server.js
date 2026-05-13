@@ -17,6 +17,11 @@ const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
 const YAPPY_CAJA_BASE_URL = process.env.YAPPY_CAJA_BASE_URL;
 const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
 const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
+const crypto = require("crypto");
+require("dotenv").config();
 
 app.get("/", (req, res) => {
   res.json({
@@ -234,85 +239,59 @@ app.get("/api/yappy/caja/config-test", (req, res) => {
 // LOGIN TEST YAPPY EN CAJA
 // ======================================
 app.get("/api/yappy/caja/session-test", async (req, res) => {
-  const pruebas = [
-    {
-      nombre: "api-key / secret-key",
-      headers: {
-        "api-key": YAPPY_CAJA_API_KEY,
-        "secret-key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-    },
-    {
-      nombre: "API-Key / API-secret-Key",
-      headers: {
-        "API-Key": YAPPY_CAJA_API_KEY,
-        "API-secret-Key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-    },
-    {
-      nombre: "apiKey / secretKey",
-      headers: {
-        apiKey: YAPPY_CAJA_API_KEY,
-        secretKey: YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-    },
-    {
-      nombre: "apikey / secretkey",
-      headers: {
-        apikey: YAPPY_CAJA_API_KEY,
-        secretkey: YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-    },
-    {
-      nombre: "x-api-key / x-secret-key",
-      headers: {
-        "x-api-key": YAPPY_CAJA_API_KEY,
-        "x-secret-key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-    },
-  ];
 
-  const resultados = [];
+  try {
 
-  for (const prueba of pruebas) {
-    try {
-      const response = await axios.post(
-        `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-        {
-          body: {
-           code: YAPPY_CAJA_SECRET_KEY,
-          },
+    const code = crypto
+      .createHash("sha256")
+      .update(
+        YAPPY_CAJA_API_KEY +
+        YAPPY_CAJA_SECRET_KEY
+      )
+      .digest("hex");
+
+    console.log("CODE GENERADO:", code);
+
+    const response = await axios.post(
+
+      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+
+      {
+        body: {
+          code: code,
         },
-        {
-          headers: prueba.headers,
-          timeout: 15000,
-        }
-      );
+      },
 
-      return res.json({
-        ok: true,
-        metodoCorrecto: prueba.nombre,
-        data: response.data,
-      });
-    } catch (error) {
-      resultados.push({
-        metodo: prueba.nombre,
-        statusHttp: error.response?.status || null,
-        error: error.response?.data || error.message,
-      });
-    }
+      {
+        headers: {
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          "Content-Type": "application/json",
+        },
+
+        timeout: 15000,
+      }
+    );
+
+    return res.json({
+      ok: true,
+      codeGenerado: code,
+      data: response.data,
+    });
+
+  } catch (error) {
+
+    console.log("ERROR LOGIN YAPPY CAJA");
+
+    console.log(
+      error.response?.data || error.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: error.response?.data || error.message,
+    });
   }
-
-  return res.status(500).json({
-    ok: false,
-    message: "Ninguna combinación de headers funcionó.",
-    resultados,
-  });
 });
 
 const PORT = process.env.PORT || 3000;
