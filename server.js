@@ -231,6 +231,48 @@ app.get("/api/yappy/caja/config-test", (req, res) => {
   });
 });
 // ======================================
+// LOGIN TEST YAPPY EN CAJA
+// ======================================
+
+app.get("/api/yappy/caja/session-test", async (req, res) => {
+
+  try {
+
+    const response = await axios.post(
+
+      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+
+      {},
+
+      {
+        headers: {
+          "x-api-key": YAPPY_CAJA_API_KEY,
+          "x-secret-key": YAPPY_CAJA_SECRET_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return res.json({
+      ok: true,
+      data: response.data,
+    });
+
+  } catch (error) {
+
+    console.log("ERROR LOGIN YAPPY CAJA");
+
+    console.log(
+      error.response?.data || error.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: error.response?.data || error.message,
+    });
+  }
+});
+// ======================================
 // IPN / CALLBACK YAPPY
 // ======================================
 
