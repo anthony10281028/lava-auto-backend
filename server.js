@@ -48,19 +48,19 @@ app.post("/api/yappy/create-order", async (req, res) => {
     let validar;
 
     try {
-      validar = await axios.post(
-        `${BASE_URL}/payments/validate/merchant`,
-        {
-          merchantId: MERCHANT_ID,
-          urlDomain: DOMAIN,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
+        validar = await axios.post(
+          `${BASE_URL}/payments/validate/merchant`,
+          {
+            merchantId: MERCHANT_ID,
+            urlDomain: DOMAIN.replace("https://", "").replace("http://", ""),
           },
-          timeout: 15000,
-        }
-      );
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            timeout: 15000,
+          }
+        );
 
       console.log("VALIDAR COMERCIO OK:", JSON.stringify(validar.data, null, 2));
     } catch (error) {
