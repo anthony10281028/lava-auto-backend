@@ -288,6 +288,106 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
     });
   }
 });
+app.get("/api/yappy/caja/session-test-v2", async (req, res) => {
+  const basicToken = Buffer.from(
+    `${YAPPY_CAJA_API_KEY}:${YAPPY_CAJA_SECRET_KEY}`
+  ).toString("base64");
+
+  const sha256Code = crypto
+    .createHash("sha256")
+    .update(YAPPY_CAJA_API_KEY + YAPPY_CAJA_SECRET_KEY)
+    .digest("hex");
+
+  const pruebas = [
+    {
+      nombre: "Basic Auth + code secret",
+      headers: {
+        Authorization: `Basic ${basicToken}`,
+        "Content-Type": "application/json",
+      },
+      code: YAPPY_CAJA_SECRET_KEY,
+    },
+    {
+      nombre: "Bearer API Key + code secret",
+      headers: {
+        Authorization: `Bearer ${YAPPY_CAJA_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      code: YAPPY_CAJA_SECRET_KEY,
+    },
+    {
+      nombre: "Bearer Secret Key + code api",
+      headers: {
+        Authorization: `Bearer ${YAPPY_CAJA_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      code: YAPPY_CAJA_API_KEY,
+    },
+    {
+      nombre: "Headers api-key/secret-key + code sha256",
+      headers: {
+        "api-key": YAPPY_CAJA_API_KEY,
+        "secret-key": YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
+      code: sha256Code,
+    },
+    {
+      nombre: "Headers oficiales Swagger + code secret",
+      headers: {
+        "API-Key": YAPPY_CAJA_API_KEY,
+        "API-secret-Key": YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
+      code: YAPPY_CAJA_SECRET_KEY,
+    },
+    {
+      nombre: "secretKey estilo payment-wc + code secret",
+      headers: {
+        secretKey: YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
+      code: YAPPY_CAJA_SECRET_KEY,
+    },
+  ];
+
+  const resultados = [];
+
+  for (const prueba of pruebas) {
+    try {
+      const response = await axios.post(
+        `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+        {
+          body: {
+            code: prueba.code,
+          },
+        },
+        {
+          headers: prueba.headers,
+          timeout: 15000,
+        }
+      );
+
+      return res.json({
+        ok: true,
+        metodoCorrecto: prueba.nombre,
+        data: response.data,
+      });
+    } catch (error) {
+      resultados.push({
+        metodo: prueba.nombre,
+        statusHttp: error.response?.status || null,
+        error: error.response?.data || error.message,
+      });
+    }
+  }
+
+  return res.status(500).json({
+    ok: false,
+    message: "Ninguna prueba v2 funcionó.",
+    resultados,
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 
