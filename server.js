@@ -14,6 +14,9 @@ const DOMAIN = process.env.YAPPY_DOMAIN;
 const ALIAS_YAPPY = process.env.YAPPY_ALIAS;
 const IPN_URL = process.env.YAPPY_IPN_URL;
 const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
+const YAPPY_CAJA_BASE_URL = process.env.YAPPY_CAJA_BASE_URL;
+const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
+const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
 
 app.get("/", (req, res) => {
   res.json({
@@ -215,7 +218,18 @@ app.post("/api/yappy/create-order", async (req, res) => {
       "Este endpoint fue reemplazado. Usa /api/yappy/create-order-web para Web Checkout o /api/yappy/create-qr para Yappy en Caja.",
   });
 });
+// ======================================
+// TEST CONFIG YAPPY EN CAJA
+// ======================================
 
+app.get("/api/yappy/caja/config-test", (req, res) => {
+  res.json({
+    ok: true,
+    baseUrl: YAPPY_CAJA_BASE_URL || "NO CONFIGURADO",
+    apiKey: YAPPY_CAJA_API_KEY ? "CARGADO" : "NO CONFIGURADO",
+    secretKey: YAPPY_CAJA_SECRET_KEY ? "CARGADO" : "NO CONFIGURADO",
+  });
+});
 // ======================================
 // IPN / CALLBACK YAPPY
 // ======================================
