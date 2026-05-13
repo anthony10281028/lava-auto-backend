@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
@@ -15,9 +14,12 @@ const DOMAIN = process.env.YAPPY_DOMAIN;
 const ALIAS_YAPPY = process.env.YAPPY_ALIAS;
 const IPN_URL = process.env.YAPPY_IPN_URL;
 const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
+
 const YAPPY_CAJA_BASE_URL = process.env.YAPPY_CAJA_BASE_URL;
 const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
 const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
+const YAPPY_CAJA_SEED = process.env.YAPPY_CAJA_SEED;
+
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -34,6 +36,8 @@ app.get("/rutas", (req, res) => {
       "GET /rutas",
       "POST /api/yappy/create-order-web",
       "POST /api/yappy/create-qr",
+      "GET /api/yappy/caja/config-test",
+      "GET /api/yappy/caja/session-test",
       "POST /api/yappy/ipn",
     ],
   });
@@ -54,15 +58,6 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
       });
     }
 
-    console.log("========== CONFIG YAPPY WEB ==========");
-    console.log("BASE_URL:", BASE_URL);
-    console.log("MERCHANT_ID:", MERCHANT_ID ? "CARGADO" : "VACÍO");
-    console.log("DOMAIN:", DOMAIN);
-    console.log("ALIAS_YAPPY:", ALIAS_YAPPY);
-    console.log("IPN_URL:", IPN_URL);
-    console.log("TOTAL:", total);
-    console.log("======================================");
-
     let validar;
 
     try {
@@ -80,14 +75,7 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
           timeout: 15000,
         }
       );
-
-      console.log("VALIDAR COMERCIO OK:", JSON.stringify(validar.data, null, 2));
     } catch (error) {
-      console.log("ERROR EN VALIDAR COMERCIO");
-      console.log("STATUS:", error.response?.status);
-      console.log("DATA:", JSON.stringify(error.response?.data, null, 2));
-      console.log("MESSAGE:", error.message);
-
       return res.status(500).json({
         ok: false,
         paso: "validar_comercio",
@@ -134,8 +122,6 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
         }
       );
 
-      console.log("CREAR ORDEN WEB OK:", JSON.stringify(orden.data, null, 2));
-
       return res.json({
         ok: true,
         tipo: "web_checkout",
@@ -143,11 +129,6 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
         data: orden.data,
       });
     } catch (error) {
-      console.log("ERROR EN CREAR ORDEN WEB");
-      console.log("STATUS:", error.response?.status);
-      console.log("DATA:", JSON.stringify(error.response?.data, null, 2));
-      console.log("MESSAGE:", error.message);
-
       return res.status(500).json({
         ok: false,
         paso: "crear_orden_web",
@@ -156,8 +137,6 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
       });
     }
   } catch (error) {
-    console.log("ERROR GENERAL WEB:", error.message);
-
     return res.status(500).json({
       ok: false,
       paso: "general_web",
@@ -167,8 +146,7 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
 });
 
 // ======================================
-// YAPPY EN CAJA / QR DINÁMICO
-// Endpoint preparado para integrar QR real
+// YAPPY QR EN APP / ORDEN LOCAL
 // ======================================
 
 app.post("/api/yappy/create-qr", async (req, res) => {
@@ -193,31 +171,29 @@ app.post("/api/yappy/create-qr", async (req, res) => {
 
     return res.json({
       ok: true,
-      tipo: "yappy_caja_qr",
+      tipo: "yappy_qr_estatico",
       orderId,
       total: totalFormato,
       concepto: concepto || "Lavado Lava Auto",
-      message: "Endpoint preparado para Yappy en Caja. Falta conectar el endpoint oficial de QR dinámico.",
+      message: "Orden generada para cobro con QR Yappy en app.",
     });
   } catch (error) {
-    console.log("ERROR GENERAL QR:", error.message);
-
     return res.status(500).json({
       ok: false,
-      paso: "crear_qr_caja",
+      paso: "crear_qr",
       error: error.message,
     });
   }
 });
 
-// Mantengo compatibilidad con tu endpoint anterior
 app.post("/api/yappy/create-order", async (req, res) => {
   return res.status(410).json({
     ok: false,
     message:
-      "Este endpoint fue reemplazado. Usa /api/yappy/create-order-web para Web Checkout o /api/yappy/create-qr para Yappy en Caja.",
+      "Este endpoint fue reemplazado. Usa /api/yappy/create-order-web o /api/yappy/create-qr.",
   });
 });
+
 // ======================================
 // TEST CONFIG YAPPY EN CAJA
 // ======================================
@@ -228,164 +204,66 @@ app.get("/api/yappy/caja/config-test", (req, res) => {
     baseUrl: YAPPY_CAJA_BASE_URL || "NO CONFIGURADO",
     apiKey: YAPPY_CAJA_API_KEY ? "CARGADO" : "NO CONFIGURADO",
     secretKey: YAPPY_CAJA_SECRET_KEY ? "CARGADO" : "NO CONFIGURADO",
+    seed: YAPPY_CAJA_SEED ? "CARGADO" : "NO CONFIGURADO",
   });
 });
+
 // ======================================
-// LOGIN TEST YAPPY EN CAJA
+// LOGIN TEST YAPPY EN CAJA CON SEMILLA
 // ======================================
+
 app.get("/api/yappy/caja/session-test", async (req, res) => {
-
   try {
-
-    const code = crypto
-      .createHash("sha256")
-      .update(
-        YAPPY_CAJA_API_KEY +
-        YAPPY_CAJA_SECRET_KEY
-      )
-      .digest("hex");
-
-    console.log("CODE GENERADO:", code);
+    if (!YAPPY_CAJA_SEED) {
+      return res.status(400).json({
+        ok: false,
+        message: "Falta configurar YAPPY_CAJA_SEED en Render.",
+      });
+    }
 
     const response = await axios.post(
-
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-
       {
         body: {
-          code: code,
+          code: YAPPY_CAJA_SEED,
         },
       },
-
       {
         headers: {
           "api-key": YAPPY_CAJA_API_KEY,
           "secret-key": YAPPY_CAJA_SECRET_KEY,
           "Content-Type": "application/json",
         },
-
         timeout: 15000,
       }
     );
 
     return res.json({
       ok: true,
-      codeGenerado: code,
       data: response.data,
     });
-
   } catch (error) {
-
     console.log("ERROR LOGIN YAPPY CAJA");
-
-    console.log(
-      error.response?.data || error.message
-    );
+    console.log("STATUS:", error.response?.status);
+    console.log("DATA:", error.response?.data || error.message);
 
     return res.status(500).json({
       ok: false,
+      statusHttp: error.response?.status,
       error: error.response?.data || error.message,
     });
   }
 });
-app.get("/api/yappy/caja/session-test-v2", async (req, res) => {
-  const basicToken = Buffer.from(
-    `${YAPPY_CAJA_API_KEY}:${YAPPY_CAJA_SECRET_KEY}`
-  ).toString("base64");
 
-  const sha256Code = crypto
-    .createHash("sha256")
-    .update(YAPPY_CAJA_API_KEY + YAPPY_CAJA_SECRET_KEY)
-    .digest("hex");
+// ======================================
+// IPN / CALLBACK YAPPY
+// ======================================
 
-  const pruebas = [
-    {
-      nombre: "Basic Auth + code secret",
-      headers: {
-        Authorization: `Basic ${basicToken}`,
-        "Content-Type": "application/json",
-      },
-      code: YAPPY_CAJA_SECRET_KEY,
-    },
-    {
-      nombre: "Bearer API Key + code secret",
-      headers: {
-        Authorization: `Bearer ${YAPPY_CAJA_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      code: YAPPY_CAJA_SECRET_KEY,
-    },
-    {
-      nombre: "Bearer Secret Key + code api",
-      headers: {
-        Authorization: `Bearer ${YAPPY_CAJA_SECRET_KEY}`,
-        "Content-Type": "application/json",
-      },
-      code: YAPPY_CAJA_API_KEY,
-    },
-    {
-      nombre: "Headers api-key/secret-key + code sha256",
-      headers: {
-        "api-key": YAPPY_CAJA_API_KEY,
-        "secret-key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-      code: sha256Code,
-    },
-    {
-      nombre: "Headers oficiales Swagger + code secret",
-      headers: {
-        "API-Key": YAPPY_CAJA_API_KEY,
-        "API-secret-Key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-      code: YAPPY_CAJA_SECRET_KEY,
-    },
-    {
-      nombre: "secretKey estilo payment-wc + code secret",
-      headers: {
-        secretKey: YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-      code: YAPPY_CAJA_SECRET_KEY,
-    },
-  ];
+app.post("/api/yappy/ipn", (req, res) => {
+  console.log("IPN YAPPY:", req.body);
 
-  const resultados = [];
-
-  for (const prueba of pruebas) {
-    try {
-      const response = await axios.post(
-        `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-        {
-          body: {
-            code: prueba.code,
-          },
-        },
-        {
-          headers: prueba.headers,
-          timeout: 15000,
-        }
-      );
-
-      return res.json({
-        ok: true,
-        metodoCorrecto: prueba.nombre,
-        data: response.data,
-      });
-    } catch (error) {
-      resultados.push({
-        metodo: prueba.nombre,
-        statusHttp: error.response?.status || null,
-        error: error.response?.data || error.message,
-      });
-    }
-  }
-
-  return res.status(500).json({
-    ok: false,
-    message: "Ninguna prueba v2 funcionó.",
-    resultados,
+  return res.json({
+    ok: true,
   });
 });
 
