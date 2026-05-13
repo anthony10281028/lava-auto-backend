@@ -13,6 +13,7 @@ const MERCHANT_ID = process.env.YAPPY_MERCHANT_ID;
 const DOMAIN = process.env.YAPPY_DOMAIN;
 const ALIAS_YAPPY = process.env.YAPPY_ALIAS;
 const IPN_URL = process.env.YAPPY_IPN_URL;
+const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
 
 app.get("/", (req, res) => {
   res.json({
@@ -52,11 +53,12 @@ app.post("/api/yappy/create-order", async (req, res) => {
           `${BASE_URL}/payments/validate/merchant`,
           {
             merchantId: MERCHANT_ID,
-            urlDomain: DOMAIN.replace("https://", "").replace("http://", ""),
+            urlDomain: "lava-auto-backend.onrender.com",
           },
           {
             headers: {
               "Content-Type": "application/json",
+              secretKey: SECRET_KEY,
             },
             timeout: 15000,
           }
