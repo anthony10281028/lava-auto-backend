@@ -53,7 +53,7 @@ app.post("/api/yappy/create-order", async (req, res) => {
           `${BASE_URL}/payments/validate/merchant`,
           {
             merchantId: MERCHANT_ID,
-            urlDomain: "lava-auto-backend.onrender.com",
+            urlDomain: DOMAIN,
           },
           {
             headers: {
