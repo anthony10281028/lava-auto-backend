@@ -233,7 +233,6 @@ app.get("/api/yappy/caja/config-test", (req, res) => {
 // ======================================
 // LOGIN TEST YAPPY EN CAJA
 // ======================================
-
 app.get("/api/yappy/caja/session-test", async (req, res) => {
   try {
     const response = await axios.post(
@@ -245,8 +244,8 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
       },
       {
         headers: {
-          "API Key": YAPPY_CAJA_API_KEY,
-          "API secret Key": YAPPY_CAJA_SECRET_KEY,
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
           "Content-Type": "application/json",
         },
         timeout: 15000,
