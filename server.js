@@ -23,23 +23,59 @@ const YAPPY_CAJA_SEED = process.env.YAPPY_CAJA_SEED;
 app.get("/", (req, res) => {
   res.json({
     ok: true,
-    message: "Backend Lava Auto activo - Yappy Caja",
+    message: "Backend Lava Auto activo - QR estatico",
   });
 });
 
 app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
-    version: "Yappy Caja v1",
+    version: "QR estatico v1",
     rutas: [
       "GET /",
       "GET /rutas",
+      "POST /api/yappy/create-qr",
       "POST /api/yappy/create-order-web",
       "GET /api/yappy/caja/session-test",
       "POST /api/yappy/caja/create-payment",
       "POST /api/yappy/ipn",
     ],
   });
+});
+
+// ======================================
+// QR ESTÁTICO
+// ======================================
+
+app.post("/api/yappy/create-qr", async (req, res) => {
+  try {
+    const { total, concepto } = req.body;
+
+    if (!total || isNaN(total)) {
+      return res.status(400).json({
+        ok: false,
+        message: "Debe enviar un total válido",
+      });
+    }
+
+    const orderId = `LAVA${Date.now()}`;
+    const totalFormato = Number(total).toFixed(2);
+
+    return res.json({
+      ok: true,
+      tipo: "yappy_qr_estatico",
+      orderId,
+      total: totalFormato,
+      concepto: concepto || "Lavado Lava Auto",
+      qrImage: "local",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      paso: "crear_qr_estatico",
+      error: error.message,
+    });
+  }
 });
 
 // ======================================
@@ -183,7 +219,6 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     const orderId = `LAVA${Date.now()}`;
     const totalFormato = Number(total).toFixed(2);
 
-    // 1. Login Yappy Caja
     const loginResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
       {
@@ -217,7 +252,6 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       });
     }
 
-    // 2. Crear QR dinámico
     const paymentResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/payments/qr`,
       {
