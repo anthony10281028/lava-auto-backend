@@ -205,41 +205,41 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
   const resultados = [];
 
   for (const unidad of unidades) {
-            try {
-              const response = await axios.post(
-                `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-                {
-                  body: {
-                    code: YAPPY_CAJA_SEED,
-                    groupId: "Lavaauto",
-                    unitId: unidad,
-                  },
-                },
-                {
-                  headers: {
-                    "api-key": YAPPY_CAJA_API_KEY,
-                    "secret-key": YAPPY_CAJA_SECRET_KEY,
-                    "Content-Type": "application/json",
-                  },
-                  timeout: 15000,
-                }
-              );
+try {
+  const response = await axios.post(
+    `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+    {
+      body: {
+        code: YAPPY_CAJA_SEED,
+        groupId: "Lavaauto",
+        unitId: unidad,
+      },
+    },
+    {
+      headers: {
+        "api-key": YAPPY_CAJA_API_KEY,
+        "secret-key": YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
+      timeout: 15000,
+    }
+  );
 
-              return res.json({
-                ok: true,
-                unidadCorrecta: unidad,
-                data: response.data,
-              });
-            } catch (error) {
-              console.log("ERROR YAPPY LOGIN:");
-              console.log(error.response?.data || error.message);
+  return res.json({
+    ok: true,
+    unidadCorrecta: unidad,
+    data: response.data,
+  });
+} catch (error) {
+  console.log("ERROR YAPPY LOGIN:");
+  console.log(error.response?.data || error.message);
 
-              resultados.push({
-                unidad,
-                statusHttp: error.response?.status || null,
-                error: error.response?.data || error.message,
-              });
-            }
+  resultados.push({
+    unidad,
+    statusHttp: error.response?.status || null,
+    error: error.response?.data || error.message,
+  });
+}
           }
 
   return res.status(500).json({
