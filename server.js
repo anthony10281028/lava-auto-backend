@@ -141,9 +141,7 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
     const loginResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
       {
-        body: {
-          code: YAPPY_CAJA_SEED,
-        },
+        code: YAPPY_CAJA_SEED,
       },
       {
         headers: {
