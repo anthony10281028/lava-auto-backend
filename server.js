@@ -131,6 +131,13 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
 
 app.get("/api/yappy/caja/session-test", async (req, res) => {
   try {
+    console.log("==== LOGIN YAPPY ====");
+    console.log("BASE URL:", YAPPY_CAJA_BASE_URL);
+    console.log("API KEY:", YAPPY_CAJA_API_KEY ? "CARGADA" : "VACÍA");
+    console.log("SECRET:", YAPPY_CAJA_SECRET_KEY ? "CARGADA" : "VACÍA");
+    console.log("SEED:", YAPPY_CAJA_SEED ? "CARGADA" : "VACÍA");
+    console.log("=====================");
+
     const loginResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
       {
