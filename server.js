@@ -200,47 +200,47 @@ app.post("/api/yappy/create-order", async (req, res) => {
 // ======================================
 
 app.get("/api/yappy/caja/session-test", async (req, res) => {
-  const unidades = ["LVAE-01", "LVAE-02"];
+  const unidades = ["LVAE-01"];
 
   const resultados = [];
 
   for (const unidad of unidades) {
-try {
-  const response = await axios.post(
-    `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-    {
-      body: {
-        code: YAPPY_CAJA_SEED,
-        groupId: "Lavaauto",
-        unitId: unidad,
-      },
-    },
-    {
-      headers: {
-        "api-key": YAPPY_CAJA_API_KEY,
-        "secret-key": YAPPY_CAJA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
-      timeout: 15000,
+    try {
+      const response = await axios.post(
+        `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+        {
+          body: {
+            code: YAPPY_CAJA_SEED,
+            groupId: "Deliciasocuenaslvae",
+            unitId: unidad,
+          },
+        },
+        {
+          headers: {
+            "Api-Key": YAPPY_CAJA_API_KEY,
+            "Secret-Key": YAPPY_CAJA_SECRET_KEY,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        }
+      );
+
+      return res.json({
+        ok: true,
+        unidadCorrecta: unidad,
+        data: response.data,
+      });
+    } catch (error) {
+      console.log("ERROR YAPPY LOGIN:");
+      console.log(error.response?.data || error.message);
+
+      resultados.push({
+        unidad,
+        statusHttp: error.response?.status || null,
+        error: error.response?.data || error.message,
+      });
     }
-  );
-
-  return res.json({
-    ok: true,
-    unidadCorrecta: unidad,
-    data: response.data,
-  });
-} catch (error) {
-  console.log("ERROR YAPPY LOGIN:");
-  console.log(error.response?.data || error.message);
-
-  resultados.push({
-    unidad,
-    statusHttp: error.response?.status || null,
-    error: error.response?.data || error.message,
-  });
-}
-          }
+  }
 
   return res.status(500).json({
     ok: false,
@@ -269,7 +269,7 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       {
         body: {
           code: YAPPY_CAJA_SEED,
-          groupId: "Lavaauto",
+          groupId: "Deliciasocuenaslvae",
           unitId: unidad,
           deviceId: unidad,
           collectionAlias: unidad,
@@ -277,8 +277,8 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       },
       {
         headers: {
-          "api-key": YAPPY_CAJA_API_KEY,
-          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          "Api-Key": YAPPY_CAJA_API_KEY,
+          "Secret-Key": YAPPY_CAJA_SECRET_KEY,
           "Content-Type": "application/json",
         },
         timeout: 15000,
@@ -313,8 +313,8 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       },
       {
         headers: {
-          "api-key": YAPPY_CAJA_API_KEY,
-          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          "Api-Key": YAPPY_CAJA_API_KEY,
+          "Secret-Key": YAPPY_CAJA_SECRET_KEY,
           Authorization: sessionToken,
           "Content-Type": "application/json",
         },
