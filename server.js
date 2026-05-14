@@ -264,26 +264,24 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     const unidad = "LVAE-01";
 
     // 1. Iniciar sesión en Yappy en Caja
-    const loginResponse = await axios.post(
-      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-      {
-        body: {
-          code: YAPPY_CAJA_SEED,
-          groupId: "Deliciasocuenaslvae",
-          unitId: unidad,
-          deviceId: unidad,
-          collectionAlias: unidad,
-        },
-      },
-      {
-        headers: {
-          "Api-Key": YAPPY_CAJA_API_KEY,
-          "Secret-Key": YAPPY_CAJA_SECRET_KEY,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
+          const response = await axios.post(
+            `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+            {
+              body: {
+                code: YAPPY_CAJA_SEED,
+                groupId: "Deliciasocuenaslvae",
+                unitId: "LVAE-01",
+              },
+            },
+            {
+              headers: {
+                "api-key": YAPPY_CAJA_API_KEY,
+                "secret-key": YAPPY_CAJA_SECRET_KEY,
+                "Content-Type": "application/json",
+              },
+              timeout: 15000,
+            }
+          );
 
     const sessionToken =
       loginResponse.data?.body?.token ||
