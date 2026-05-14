@@ -1,17 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-// ======================================
-// VARIABLES
-// ======================================
 
 const BASE_URL = process.env.YAPPY_PAYMENT_BASE_URL;
 const MERCHANT_ID = process.env.YAPPY_MERCHANT_ID;
@@ -25,41 +20,6 @@ const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
 const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
 const YAPPY_CAJA_SEED = process.env.YAPPY_CAJA_SEED;
 
-// ======================================
-// ENCRIPTAR SEMILLA
-// ======================================
-
-function encryptSeed(seed, secretKey) {
-  try {
-    const key = Buffer.from(secretKey, "base64");
-
-    const iv = Buffer.alloc(16, 0);
-
-    const cipher = crypto.createCipheriv(
-      "aes-256-cbc",
-      key,
-      iv
-    );
-
-    let encrypted = cipher.update(
-      seed,
-      "utf8",
-      "base64"
-    );
-
-    encrypted += cipher.final("base64");
-
-    return encrypted;
-  } catch (error) {
-    console.log("ERROR ENCRYPT:", error.message);
-    return seed;
-  }
-}
-
-// ======================================
-// ROOT
-// ======================================
-
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -67,14 +27,10 @@ app.get("/", (req, res) => {
   });
 });
 
-// ======================================
-// RUTAS
-// ======================================
-
 app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
-    version: "Yappy Caja v2",
+    version: "Yappy Caja v1",
     rutas: [
       "GET /",
       "GET /rutas",
@@ -87,7 +43,7 @@ app.get("/rutas", (req, res) => {
 });
 
 // ======================================
-// BOTÓN DE PAGO
+// YAPPY BOTÓN DE PAGO / WEB CHECKOUT
 // ======================================
 
 app.post("/api/yappy/create-order-web", async (req, res) => {
@@ -121,11 +77,13 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
     if (!token) {
       return res.status(500).json({
         ok: false,
+        paso: "validar_comercio",
         message: "Yappy no devolvió token",
+        respuesta: validar.data,
       });
     }
 
-    const orderId = `L${Date.now()}`;
+    const orderId = `L${Date.now().toString().slice(-14)}`;
     const totalFormato = Number(total).toFixed(2);
 
     const orden = await axios.post(
@@ -153,50 +111,32 @@ app.post("/api/yappy/create-order-web", async (req, res) => {
 
     return res.json({
       ok: true,
+      tipo: "web_checkout",
       orderId,
       data: orden.data,
     });
   } catch (error) {
     return res.status(500).json({
       ok: false,
+      paso: "crear_orden_web",
+      statusHttp: error.response?.status,
       error: error.response?.data || error.message,
     });
   }
 });
 
 // ======================================
-// TEST LOGIN YAPPY CAJA
+// TEST LOGIN YAPPY EN CAJA
 // ======================================
 
 app.get("/api/yappy/caja/session-test", async (req, res) => {
   try {
-    console.log("==== LOGIN YAPPY ====");
-    console.log("BASE URL:", YAPPY_CAJA_BASE_URL);
-    console.log(
-      "API KEY:",
-      YAPPY_CAJA_API_KEY ? "CARGADA" : "VACÍA"
-    );
-    console.log(
-      "SECRET:",
-      YAPPY_CAJA_SECRET_KEY ? "CARGADA" : "VACÍA"
-    );
-    console.log(
-      "SEED:",
-      YAPPY_CAJA_SEED ? "CARGADA" : "VACÍA"
-    );
-    console.log("=====================");
-
-    const encryptedSeed = encryptSeed(
-      YAPPY_CAJA_SEED,
-      YAPPY_CAJA_SECRET_KEY
-    );
-
-    console.log("SEED ENCRYPTED:", encryptedSeed);
-
     const loginResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
       {
-        code: encryptedSeed,
+        body: {
+          code: YAPPY_CAJA_SEED,
+        },
       },
       {
         headers: {
@@ -226,7 +166,7 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
 });
 
 // ======================================
-// CREAR QR DINÁMICO
+// CREAR PAGO / QR YAPPY EN CAJA
 // ======================================
 
 app.post("/api/yappy/caja/create-payment", async (req, res) => {
@@ -243,16 +183,13 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     const orderId = `LAVA${Date.now()}`;
     const totalFormato = Number(total).toFixed(2);
 
-    const encryptedSeed = encryptSeed(
-      YAPPY_CAJA_SEED,
-      YAPPY_CAJA_SECRET_KEY
-    );
-
-    // LOGIN
+    // 1. Login Yappy Caja
     const loginResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
       {
-        code: encryptedSeed,
+        body: {
+          code: YAPPY_CAJA_SEED,
+        },
       },
       {
         headers: {
@@ -266,28 +203,30 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
 
     const sessionToken =
       loginResponse.data?.body?.token ||
+      loginResponse.data?.body?.access_token ||
       loginResponse.data?.token ||
       loginResponse.data?.access_token ||
-      loginResponse.data?.body?.access_token;
+      loginResponse.data?.body?.sessionToken;
 
     if (!sessionToken) {
       return res.status(500).json({
         ok: false,
-        message: "Yappy no devolvió token",
+        paso: "login_yappy_caja",
+        message: "Yappy no devolvió token de sesión",
         respuesta: loginResponse.data,
       });
     }
 
-    // CREAR QR
+    // 2. Crear QR dinámico
     const paymentResponse = await axios.post(
       `${YAPPY_CAJA_BASE_URL}/v1/payments/qr`,
       {
-        orderId,
-        amount: totalFormato,
-        description:
-          concepto ||
-          `Lavado Lava Auto ${placa || ""}`,
-        currency: "USD",
+        body: {
+          orderId,
+          amount: totalFormato,
+          description: concepto || `Lavado Lava Auto ${placa || ""}`,
+          currency: "USD",
+        },
       },
       {
         headers: {
@@ -303,22 +242,35 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     const qrImage =
       paymentResponse.data?.body?.qr ||
       paymentResponse.data?.body?.qrImage ||
+      paymentResponse.data?.body?.image ||
       paymentResponse.data?.qr ||
       paymentResponse.data?.qrImage;
 
+    if (!qrImage) {
+      return res.status(500).json({
+        ok: false,
+        paso: "crear_qr_yappy_caja",
+        message: "Yappy no devolvió imagen QR",
+        respuesta: paymentResponse.data,
+      });
+    }
+
     return res.json({
       ok: true,
+      tipo: "yappy_qr_dinamico",
       orderId,
       total: totalFormato,
+      concepto: concepto || "Lavado Lava Auto",
       qrImage,
       respuestaYappy: paymentResponse.data,
     });
   } catch (error) {
-    console.log("ERROR CREAR PAGO:");
+    console.log("ERROR CREAR PAGO YAPPY CAJA:");
     console.log(error.response?.data || error.message);
 
     return res.status(500).json({
       ok: false,
+      paso: "crear_pago_yappy_caja",
       statusHttp: error.response?.status || null,
       error: error.response?.data || error.message,
     });
@@ -326,7 +278,7 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
 });
 
 // ======================================
-// IPN
+// IPN / CALLBACK YAPPY
 // ======================================
 
 app.post("/api/yappy/ipn", (req, res) => {
@@ -336,10 +288,6 @@ app.post("/api/yappy/ipn", (req, res) => {
     ok: true,
   });
 });
-
-// ======================================
-// START
-// ======================================
 
 const PORT = process.env.PORT || 3000;
 
