@@ -210,7 +210,6 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
         `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
         {
           body: {
-            code: YAPPY_CAJA_SEED,
             groupId: "Deliciasocuenaslvae",
             unitId: unidad,
           },
@@ -268,7 +267,6 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
             `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
             {
               body: {
-                code: YAPPY_CAJA_SEED,
                 groupId: "Deliciasocuenaslvae",
                 unitId: "LVAE-01",
               },
