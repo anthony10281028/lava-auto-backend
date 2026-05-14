@@ -31,15 +31,16 @@ app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
     version: "QR v2",
-    rutas: [
-      "GET /",
-      "GET /rutas",
-      "POST /api/yappy/create-order-web",
-      "POST /api/yappy/create-qr",
-      "GET /api/yappy/caja/config-test",
-      "GET /api/yappy/caja/session-test",
-      "POST /api/yappy/ipn",
-    ],
+      rutas: [
+        "GET /",
+        "GET /rutas",
+        "POST /api/yappy/create-order-web",
+        "POST /api/yappy/create-qr",
+        "POST /api/yappy/caja/create-payment",
+        "GET /api/yappy/caja/config-test",
+        "GET /api/yappy/caja/session-test",
+        "POST /api/yappy/ipn",
+      ],
   });
 });
 
@@ -245,6 +246,113 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
     message: "No se pudo iniciar sesión con las unidades de cobro.",
     resultados,
   });
+});
+app.post("/api/yappy/caja/create-payment", async (req, res) => {
+  try {
+    const { total, concepto, placa } = req.body;
+
+    if (!total || isNaN(total)) {
+      return res.status(400).json({
+        ok: false,
+        message: "Debe enviar un total válido",
+      });
+    }
+
+    const orderId = `LAVA${Date.now()}`;
+    const totalFormato = Number(total).toFixed(2);
+    const unidad = "LVAE-01";
+
+    // 1. Iniciar sesión en Yappy en Caja
+    const loginResponse = await axios.post(
+      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
+      {
+        body: {
+          code: YAPPY_CAJA_SEED,
+          groupId: "Lavaauto",
+          unitId: unidad,
+          deviceId: unidad,
+          collectionAlias: unidad,
+        },
+      },
+      {
+        headers: {
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    const sessionToken =
+      loginResponse.data?.body?.token ||
+      loginResponse.data?.token ||
+      loginResponse.data?.body?.sessionToken;
+
+    if (!sessionToken) {
+      return res.status(500).json({
+        ok: false,
+        paso: "login_yappy_caja",
+        message: "Yappy no devolvió token de sesión",
+        respuesta: loginResponse.data,
+      });
+    }
+
+    // 2. Crear cobro QR dinámico
+    const paymentResponse = await axios.post(
+      `${YAPPY_CAJA_BASE_URL}/v1/payments/qr`,
+      {
+        body: {
+          orderId,
+          amount: totalFormato,
+          description: concepto || `Lavado Lava Auto ${placa || ""}`,
+          unitId: unidad,
+          currency: "USD",
+        },
+      },
+      {
+        headers: {
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          Authorization: sessionToken,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    const qrImage =
+      paymentResponse.data?.body?.qr ||
+      paymentResponse.data?.body?.qrImage ||
+      paymentResponse.data?.qr ||
+      paymentResponse.data?.qrImage;
+
+    if (!qrImage) {
+      return res.status(500).json({
+        ok: false,
+        paso: "crear_qr_yappy_caja",
+        message: "Yappy no devolvió imagen QR",
+        respuesta: paymentResponse.data,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      tipo: "yappy_qr_dinamico",
+      orderId,
+      total: totalFormato,
+      concepto: concepto || "Lavado Lava Auto",
+      qrImage,
+      respuestaYappy: paymentResponse.data,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      paso: "crear_pago_yappy_caja",
+      statusHttp: error.response?.status,
+      error: error.response?.data || error.message,
+    });
+  }
 });
 
 // ======================================
