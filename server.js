@@ -312,12 +312,11 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
         },
       },
       {
-        headers: {
-          "Api-Key": YAPPY_CAJA_API_KEY,
-          "Secret-Key": YAPPY_CAJA_SECRET_KEY,
-          Authorization: sessionToken,
-          "Content-Type": "application/json",
-        },
+      headers: {
+        "api-key": YAPPY_CAJA_API_KEY,
+        "secret-key": YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
         timeout: 15000,
       }
     );
