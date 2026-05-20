@@ -48,10 +48,9 @@ app.get("/rutas", (req, res) => {
 // ======================================
 
 async function abrirSesionYappy() {
-  const response = await axios.post(
-    `${YAPPY_CAJA_BASE_URL}/session/device`,
-    {
-      body: {
+    const response = await axios.post(
+      `${YAPPY_CAJA_BASE_URL}/session/device`,
+      {
         device: {
           id: YAPPY_DEVICE_ID,
           name: YAPPY_DEVICE_NAME,
@@ -59,7 +58,6 @@ async function abrirSesionYappy() {
         },
         group_id: YAPPY_GROUP_ID,
       },
-    },
     {
       headers: {
         "api-key": YAPPY_CAJA_API_KEY,
