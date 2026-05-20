@@ -8,43 +8,90 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const BASE_URL = process.env.YAPPY_PAYMENT_BASE_URL;
-const MERCHANT_ID = process.env.YAPPY_MERCHANT_ID;
-const DOMAIN = process.env.YAPPY_DOMAIN;
-const ALIAS_YAPPY = process.env.YAPPY_ALIAS;
-const IPN_URL = process.env.YAPPY_IPN_URL;
-const SECRET_KEY = process.env.YAPPY_SECRET_KEY;
-
 const YAPPY_CAJA_BASE_URL = process.env.YAPPY_CAJA_BASE_URL;
 const YAPPY_CAJA_API_KEY = process.env.YAPPY_CAJA_API_KEY;
 const YAPPY_CAJA_SECRET_KEY = process.env.YAPPY_CAJA_SECRET_KEY;
-const YAPPY_CAJA_SEED = process.env.YAPPY_CAJA_SEED;
+
+const YAPPY_DEVICE_ID = process.env.YAPPY_DEVICE_ID || "LVAE-01";
+const YAPPY_DEVICE_NAME = process.env.YAPPY_DEVICE_NAME || "Caja 1";
+const YAPPY_DEVICE_USER = process.env.YAPPY_DEVICE_USER || "Lava Auto";
+const YAPPY_GROUP_ID = process.env.YAPPY_GROUP_ID || "Deliciasocuenaslvae";
+
+let yappyToken = null;
 
 app.get("/", (req, res) => {
   res.json({
     ok: true,
-    message: "Backend Lava Auto activo - QR estatico",
+    message: "Backend Lava Auto activo - Yappy en Caja Dinámico",
   });
 });
 
 app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
-    version: "QR estatico v1",
+    version: "Yappy Caja Dinamico v1",
     rutas: [
       "GET /",
       "GET /rutas",
       "POST /api/yappy/create-qr",
-      "POST /api/yappy/create-order-web",
       "GET /api/yappy/caja/session-test",
       "POST /api/yappy/caja/create-payment",
+      "GET /api/yappy/caja/transaction/:transactionId",
+      "DELETE /api/yappy/caja/session",
       "POST /api/yappy/ipn",
     ],
   });
 });
 
 // ======================================
-// QR ESTÁTICO
+// FUNCIÓN: ABRIR SESIÓN YAPPY CAJA
+// ======================================
+
+async function abrirSesionYappy() {
+  const response = await axios.post(
+    `${YAPPY_CAJA_BASE_URL}/session/device`,
+    {
+      body: {
+        device: {
+          id: YAPPY_DEVICE_ID,
+          name: YAPPY_DEVICE_NAME,
+          user: YAPPY_DEVICE_USER,
+        },
+        group_id: YAPPY_GROUP_ID,
+      },
+    },
+    {
+      headers: {
+        "api-key": YAPPY_CAJA_API_KEY,
+        "secret-key": YAPPY_CAJA_SECRET_KEY,
+        "Content-Type": "application/json",
+      },
+      timeout: 15000,
+    }
+  );
+
+  const token =
+    response.data?.body?.token ||
+    response.data?.body?.access_token ||
+    response.data?.token ||
+    response.data?.access_token;
+
+  if (!token) {
+    throw new Error(
+      "Yappy no devolvió token de sesión: " + JSON.stringify(response.data)
+    );
+  }
+
+  yappyToken = token;
+
+  return {
+    token,
+    data: response.data,
+  };
+}
+
+// ======================================
+// QR ESTÁTICO TEMPORAL
 // ======================================
 
 app.post("/api/yappy/create-qr", async (req, res) => {
@@ -79,122 +126,32 @@ app.post("/api/yappy/create-qr", async (req, res) => {
 });
 
 // ======================================
-// YAPPY BOTÓN DE PAGO / WEB CHECKOUT
-// ======================================
-
-app.post("/api/yappy/create-order-web", async (req, res) => {
-  try {
-    const { total } = req.body;
-
-    if (!total || isNaN(total)) {
-      return res.status(400).json({
-        ok: false,
-        message: "Debe enviar un total válido",
-      });
-    }
-
-    const validar = await axios.post(
-      `${BASE_URL}/payments/validate/merchant`,
-      {
-        merchantId: MERCHANT_ID,
-        urlDomain: DOMAIN,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          secretKey: SECRET_KEY,
-        },
-        timeout: 15000,
-      }
-    );
-
-    const token = validar.data?.body?.token;
-
-    if (!token) {
-      return res.status(500).json({
-        ok: false,
-        paso: "validar_comercio",
-        message: "Yappy no devolvió token",
-        respuesta: validar.data,
-      });
-    }
-
-    const orderId = `L${Date.now().toString().slice(-14)}`;
-    const totalFormato = Number(total).toFixed(2);
-
-    const orden = await axios.post(
-      `${BASE_URL}/payments/payment-wc`,
-      {
-        merchantId: MERCHANT_ID,
-        orderId,
-        domain: DOMAIN,
-        paymentDate: new Date().toISOString(),
-        aliasYappy: ALIAS_YAPPY,
-        ipnUrl: IPN_URL,
-        discount: "0.00",
-        taxes: "0.00",
-        subtotal: totalFormato,
-        total: totalFormato,
-      },
-      {
-        headers: {
-          Authorization: token,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
-
-    return res.json({
-      ok: true,
-      tipo: "web_checkout",
-      orderId,
-      data: orden.data,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      paso: "crear_orden_web",
-      statusHttp: error.response?.status,
-      error: error.response?.data || error.message,
-    });
-  }
-});
-
-// ======================================
-// TEST LOGIN YAPPY EN CAJA
+// TEST APERTURA SESIÓN YAPPY EN CAJA
 // ======================================
 
 app.get("/api/yappy/caja/session-test", async (req, res) => {
   try {
-    const loginResponse = await axios.post(
-      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-      {
-        body: {
-          code: YAPPY_CAJA_SEED,
-        },
-      },
-      {
-        headers: {
-          "api-key": YAPPY_CAJA_API_KEY,
-          "secret-key": YAPPY_CAJA_SECRET_KEY,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
+    console.log("==== YAPPY CAJA SESSION TEST ====");
+    console.log("BASE URL:", YAPPY_CAJA_BASE_URL);
+    console.log("API KEY:", YAPPY_CAJA_API_KEY ? "CARGADA" : "VACÍA");
+    console.log("SECRET:", YAPPY_CAJA_SECRET_KEY ? "CARGADA" : "VACÍA");
+    console.log("DEVICE:", YAPPY_DEVICE_ID);
+    console.log("GROUP:", YAPPY_GROUP_ID);
+
+    const session = await abrirSesionYappy();
 
     return res.json({
       ok: true,
-      data: loginResponse.data,
+      message: "Sesión abierta correctamente",
+      data: session.data,
     });
   } catch (error) {
-    console.log("ERROR YAPPY LOGIN:");
+    console.log("ERROR YAPPY SESSION:");
     console.log(error.response?.data || error.message);
 
     return res.status(500).json({
       ok: false,
-      paso: "login_yappy_caja",
+      paso: "session_device",
       statusHttp: error.response?.status || null,
       error: error.response?.data || error.message,
     });
@@ -202,7 +159,7 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
 });
 
 // ======================================
-// CREAR PAGO / QR YAPPY EN CAJA
+// CREAR QR DINÁMICO YAPPY EN CAJA
 // ======================================
 
 app.post("/api/yappy/caja/create-payment", async (req, res) => {
@@ -216,57 +173,33 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       });
     }
 
-    const orderId = `LAVA${Date.now()}`;
     const totalFormato = Number(total).toFixed(2);
+    const orderId = `LAVA${Date.now()}`;
 
-    const loginResponse = await axios.post(
-      `${YAPPY_CAJA_BASE_URL}/v1/session/login`,
-      {
-        body: {
-          code: YAPPY_CAJA_SEED,
-        },
-      },
-      {
-        headers: {
-          "api-key": YAPPY_CAJA_API_KEY,
-          "secret-key": YAPPY_CAJA_SECRET_KEY,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
-
-    const sessionToken =
-      loginResponse.data?.body?.token ||
-      loginResponse.data?.body?.access_token ||
-      loginResponse.data?.token ||
-      loginResponse.data?.access_token ||
-      loginResponse.data?.body?.sessionToken;
-
-    if (!sessionToken) {
-      return res.status(500).json({
-        ok: false,
-        paso: "login_yappy_caja",
-        message: "Yappy no devolvió token de sesión",
-        respuesta: loginResponse.data,
-      });
+    if (!yappyToken) {
+      await abrirSesionYappy();
     }
 
-    const paymentResponse = await axios.post(
-      `${YAPPY_CAJA_BASE_URL}/v1/payments/qr`,
+    const qrResponse = await axios.post(
+      `${YAPPY_CAJA_BASE_URL}/qr/generate/DYN`,
       {
         body: {
-          orderId,
-          amount: totalFormato,
+          charge_amount: {
+            sub_total: Number(totalFormato),
+            tax: 0,
+            tip: 0,
+            discount: 0,
+            total: Number(totalFormato),
+          },
+          order_id: orderId,
           description: concepto || `Lavado Lava Auto ${placa || ""}`,
-          currency: "USD",
         },
       },
       {
         headers: {
           "api-key": YAPPY_CAJA_API_KEY,
           "secret-key": YAPPY_CAJA_SECRET_KEY,
-          Authorization: sessionToken,
+          Authorization: `Bearer ${yappyToken}`,
           "Content-Type": "application/json",
         },
         timeout: 15000,
@@ -274,18 +207,25 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     );
 
     const qrImage =
-      paymentResponse.data?.body?.qr ||
-      paymentResponse.data?.body?.qrImage ||
-      paymentResponse.data?.body?.image ||
-      paymentResponse.data?.qr ||
-      paymentResponse.data?.qrImage;
+      qrResponse.data?.body?.qr ||
+      qrResponse.data?.body?.qr_image ||
+      qrResponse.data?.body?.qrImage ||
+      qrResponse.data?.body?.image ||
+      qrResponse.data?.qr ||
+      qrResponse.data?.qrImage;
+
+    const transactionId =
+      qrResponse.data?.body?.transaction_id ||
+      qrResponse.data?.body?.transactionId ||
+      qrResponse.data?.transaction_id ||
+      qrResponse.data?.transactionId;
 
     if (!qrImage) {
       return res.status(500).json({
         ok: false,
-        paso: "crear_qr_yappy_caja",
+        paso: "generar_qr_dinamico",
         message: "Yappy no devolvió imagen QR",
-        respuesta: paymentResponse.data,
+        respuesta: qrResponse.data,
       });
     }
 
@@ -293,14 +233,17 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       ok: true,
       tipo: "yappy_qr_dinamico",
       orderId,
+      transactionId,
       total: totalFormato,
       concepto: concepto || "Lavado Lava Auto",
       qrImage,
-      respuestaYappy: paymentResponse.data,
+      respuestaYappy: qrResponse.data,
     });
   } catch (error) {
-    console.log("ERROR CREAR PAGO YAPPY CAJA:");
+    console.log("ERROR CREAR QR YAPPY:");
     console.log(error.response?.data || error.message);
+
+    yappyToken = null;
 
     return res.status(500).json({
       ok: false,
@@ -312,7 +255,95 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
 });
 
 // ======================================
-// IPN / CALLBACK YAPPY
+// CONSULTAR TRANSACCIÓN
+// ======================================
+
+app.get("/api/yappy/caja/transaction/:transactionId", async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    if (!yappyToken) {
+      await abrirSesionYappy();
+    }
+
+    const response = await axios.get(
+      `${YAPPY_CAJA_BASE_URL}/transaction/${transactionId}`,
+      {
+        headers: {
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          Authorization: `Bearer ${yappyToken}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    return res.json({
+      ok: true,
+      data: response.data,
+    });
+  } catch (error) {
+    console.log("ERROR CONSULTAR TRANSACCIÓN:");
+    console.log(error.response?.data || error.message);
+
+    return res.status(500).json({
+      ok: false,
+      paso: "consultar_transaccion",
+      statusHttp: error.response?.status || null,
+      error: error.response?.data || error.message,
+    });
+  }
+});
+
+// ======================================
+// CERRAR SESIÓN
+// ======================================
+
+app.delete("/api/yappy/caja/session", async (req, res) => {
+  try {
+    if (!yappyToken) {
+      return res.json({
+        ok: true,
+        message: "No hay sesión activa",
+      });
+    }
+
+    const response = await axios.delete(
+      `${YAPPY_CAJA_BASE_URL}/session/device`,
+      {
+        headers: {
+          "api-key": YAPPY_CAJA_API_KEY,
+          "secret-key": YAPPY_CAJA_SECRET_KEY,
+          Authorization: `Bearer ${yappyToken}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    yappyToken = null;
+
+    return res.json({
+      ok: true,
+      message: "Sesión cerrada correctamente",
+      data: response.data,
+    });
+  } catch (error) {
+    console.log("ERROR CERRAR SESIÓN:");
+    console.log(error.response?.data || error.message);
+
+    return res.status(500).json({
+      ok: false,
+      paso: "cerrar_sesion",
+      statusHttp: error.response?.status || null,
+      error: error.response?.data || error.message,
+    });
+  }
+});
+
+// ======================================
+// IPN / CALLBACK
 // ======================================
 
 app.post("/api/yappy/ipn", (req, res) => {
