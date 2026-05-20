@@ -29,7 +29,7 @@ app.get("/", (req, res) => {
 app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
-    version: "Yappy Caja Dinamico v1",
+    version: "Yappy Caja Dinamico v2",
     rutas: [
       "GET /",
       "GET /rutas",
@@ -42,6 +42,10 @@ app.get("/rutas", (req, res) => {
     ],
   });
 });
+
+// ======================================
+// ABRIR SESIÓN YAPPY EN CAJA
+// ======================================
 
 async function abrirSesionYappy() {
   const response = await axios.post(
@@ -86,7 +90,10 @@ async function abrirSesionYappy() {
   };
 }
 
-// QR ESTÁTICO LOCAL
+// ======================================
+// QR ESTÁTICO LOCAL - RESPALDO
+// ======================================
+
 app.post("/api/yappy/create-qr", async (req, res) => {
   try {
     const { total, concepto } = req.body;
@@ -118,7 +125,10 @@ app.post("/api/yappy/create-qr", async (req, res) => {
   }
 });
 
+// ======================================
 // TEST SESIÓN YAPPY EN CAJA
+// ======================================
+
 app.get("/api/yappy/caja/session-test", async (req, res) => {
   try {
     console.log("==== YAPPY CAJA SESSION TEST ====");
@@ -148,7 +158,10 @@ app.get("/api/yappy/caja/session-test", async (req, res) => {
   }
 });
 
+// ======================================
 // CREAR QR DINÁMICO
+// ======================================
+
 app.post("/api/yappy/caja/create-payment", async (req, res) => {
   try {
     const { total, concepto, placa } = req.body;
@@ -161,6 +174,7 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
     }
 
     const totalFormato = Number(total).toFixed(2);
+    const totalNumero = Number(totalFormato);
     const orderId = `LAVA${Date.now()}`;
 
     if (!yappyToken) {
@@ -172,11 +186,11 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       {
         body: {
           charge_amount: {
-            sub_total: Number(totalFormato),
+            sub_total: totalNumero,
             tax: 0,
             tip: 0,
             discount: 0,
-            total: Number(totalFormato),
+            total: totalNumero,
           },
           order_id: orderId,
           description: concepto || `Lavado Lava Auto ${placa || ""}`,
@@ -193,37 +207,37 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       }
     );
 
-    const qrImage =
-      qrResponse.data?.body?.qr ||
-      qrResponse.data?.body?.qr_image ||
-      qrResponse.data?.body?.qrImage ||
-      qrResponse.data?.body?.image ||
-      qrResponse.data?.qr ||
-      qrResponse.data?.qrImage;
-
     const transactionId =
-      qrResponse.data?.body?.transaction_id ||
       qrResponse.data?.body?.transactionId ||
-      qrResponse.data?.transaction_id ||
-      qrResponse.data?.transactionId;
+      qrResponse.data?.body?.transaction_id ||
+      qrResponse.data?.transactionId ||
+      qrResponse.data?.transaction_id;
 
-    if (!qrImage) {
+    const hash = qrResponse.data?.body?.hash || qrResponse.data?.hash;
+
+    if (!transactionId || !hash) {
       return res.status(500).json({
         ok: false,
         paso: "generar_qr_dinamico",
-        message: "Yappy no devolvió imagen QR",
+        message: "Yappy no devolvió transactionId/hash",
         respuesta: qrResponse.data,
       });
     }
+
+    const qrPayload = JSON.stringify({
+      transactionId,
+      hash,
+    });
 
     return res.json({
       ok: true,
       tipo: "yappy_qr_dinamico",
       orderId,
       transactionId,
+      hash,
       total: totalFormato,
       concepto: concepto || "Lavado Lava Auto",
-      qrImage,
+      qrPayload,
       respuestaYappy: qrResponse.data,
     });
   } catch (error) {
@@ -241,7 +255,10 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
   }
 });
 
+// ======================================
 // CONSULTAR TRANSACCIÓN
+// ======================================
+
 app.get("/api/yappy/caja/transaction/:transactionId", async (req, res) => {
   try {
     const { transactionId } = req.params;
@@ -280,7 +297,10 @@ app.get("/api/yappy/caja/transaction/:transactionId", async (req, res) => {
   }
 });
 
+// ======================================
 // CERRAR SESIÓN
+// ======================================
+
 app.delete("/api/yappy/caja/session", async (req, res) => {
   try {
     if (!yappyToken) {
@@ -323,7 +343,10 @@ app.delete("/api/yappy/caja/session", async (req, res) => {
   }
 });
 
+// ======================================
 // IPN / CALLBACK
+// ======================================
+
 app.post("/api/yappy/ipn", (req, res) => {
   console.log("IPN YAPPY:", req.body);
 
