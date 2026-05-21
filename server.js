@@ -224,22 +224,19 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       });
     }
 
-    const qrPayload = JSON.stringify({
-      transactionId,
-      hash,
-    });
+return res.json({
+  ok: true,
+  tipo: "yappy_qr_dinamico",
+  orderId,
+  transactionId,
+  hash,
+  total: totalFormato,
+  concepto: concepto || "Lavado Lava Auto",
 
-    return res.json({
-      ok: true,
-      tipo: "yappy_qr_dinamico",
-      orderId,
-      transactionId,
-      hash,
-      total: totalFormato,
-      concepto: concepto || "Lavado Lava Auto",
-      qrPayload,
-      respuestaYappy: qrResponse.data,
-    });
+  qrPayload: qrResponse.data,
+
+  respuestaYappy: qrResponse.data,
+});
   } catch (error) {
     console.log("ERROR CREAR QR YAPPY:");
     console.log(error.response?.data || error.message);
