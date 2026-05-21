@@ -29,7 +29,7 @@ app.get("/", (req, res) => {
 app.get("/rutas", (req, res) => {
   res.json({
     ok: true,
-    version: "Yappy Caja Dinamico v2",
+    version: "Yappy Caja Dinamico v3",
     rutas: [
       "GET /",
       "GET /rutas",
@@ -224,19 +224,22 @@ app.post("/api/yappy/caja/create-payment", async (req, res) => {
       });
     }
 
-return res.json({
-  ok: true,
-  tipo: "yappy_qr_dinamico",
-  orderId,
-  transactionId,
-  hash,
-  total: totalFormato,
-  concepto: concepto || "Lavado Lava Auto",
+    const qrPayload = JSON.stringify({
+      transactionId,
+      hash,
+    });
 
-  qrPayload: qrResponse.data,
-
-  respuestaYappy: qrResponse.data,
-});
+    return res.json({
+      ok: true,
+      tipo: "yappy_qr_dinamico",
+      orderId,
+      transactionId,
+      hash,
+      total: totalFormato,
+      concepto: concepto || "Lavado Lava Auto",
+      qrPayload,
+      respuestaYappy: qrResponse.data,
+    });
   } catch (error) {
     console.log("ERROR CREAR QR YAPPY:");
     console.log(error.response?.data || error.message);
